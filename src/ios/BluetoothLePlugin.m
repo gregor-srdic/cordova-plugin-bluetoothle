@@ -1892,7 +1892,8 @@ NSString *const operationUpgradeFirmware = @"upgradeFirmware";
             // initiator.forceDfu = YES/NO; // default NO
             // initiator.packetReceiptNotificationParameter = N; // default is 12
             // initiator.logger = self; // - to get log info
-            initiator.delegate = self; // - to be informed about current state and errors
+            initiator.delegate = self;
+            initiator.alternativeAdvertisingNameEnabled = false;
             // initiator.progressDelegate = self; // - to show progress bar
             // initiator.peripheralSelector = ... // the default selector is used
             
