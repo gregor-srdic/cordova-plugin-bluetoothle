@@ -3225,54 +3225,55 @@ public class BluetoothLePlugin extends CordovaPlugin {
     } else if (requestCode == REQUEST_LOCATION_SOURCE_SETTINGS) {
       if (locationCallback != null) {
         JSONObject returnObj = new JSONObject();
-
         addProperty(returnObj, "requestLocation", isLocationEnabled());
-
         locationCallback.success(returnObj);
-
         locationCallback = null;
       }
-    } else if (requestCode == SELECT_FIRMWARE_FILE && resultCode == Activity.RESULT_OK) {
+    } else if (requestCode == SELECT_FIRMWARE_FILE){
+      if(resultCode == Activity.RESULT_OK) {
+        Uri firmwareUri = intent.getData();
+        Log.d("BLEFW", "FIRMWARE FILE SELECTED " + firmwareUri.toString());
+        BluetoothDevice device = BluetoothLePlugin.device;
+        Context ctx = cordova.getActivity();
+        JSONObject returnObj = new JSONObject();
+        addDevice(returnObj, device);
+        final DfuServiceInitiator starter = new DfuServiceInitiator(device.getAddress())
+                .setDeviceName(device.getName())
+                .setKeepBond(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          DfuServiceInitiator.createDfuNotificationChannel(ctx);
+        }
+        starter.setPrepareDataObjectDelay(300L);
+        final DfuProgressListener dfuProgressListener = new DfuProgressListenerAdapter() {
+          @Override
+          public void onDfuCompleted(final String deviceAddress) {
+            Log.d("BLEFW LISTENER", "ON UPGRADE COMPLETED ");
+            BluetoothLePlugin.callbackContext.success(returnObj);
+            DfuServiceListenerHelper.unregisterProgressListener(cordova.getActivity(), this);
+          }
 
-      Uri firmwareUri = intent.getData();
-      Log.d("BLEFW", "FIRMWARE FILE SELECTED " + firmwareUri.toString());
-      BluetoothDevice device = BluetoothLePlugin.device;
-      Context ctx = cordova.getActivity();
-      JSONObject returnObj = new JSONObject();
-      addDevice(returnObj, device);
-      final DfuServiceInitiator starter = new DfuServiceInitiator(device.getAddress())
-              .setDeviceName(device.getName())
-              .setKeepBond(true);
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        DfuServiceInitiator.createDfuNotificationChannel(ctx);
+          @Override
+          public void onDfuAborted(final String deviceAddress) {
+            Log.d("BLEFW LISTENER", "ON UPGRADE ABORTED ");
+            BluetoothLePlugin.callbackContext.error("Firmware upgrade aborted");
+            DfuServiceListenerHelper.unregisterProgressListener(ctx, this);
+          }
+
+          @Override
+          public void onError(final String deviceAddress, int error, int errorType, String message) {
+            Log.d("BLEFW LISTENER", "ON UPGRADE ERROR ");
+            BluetoothLePlugin.callbackContext.error(message);
+            DfuServiceListenerHelper.unregisterProgressListener(ctx, this);
+          }
+        };
+        DfuServiceListenerHelper.registerProgressListener(ctx, dfuProgressListener);
+        starter.setZip(firmwareUri);
+        starter.start(cordova.getActivity(), DfuService.class);
+        Log.d("BLEFW", "UPGRADE STARTED");
+      } else {
+        Log.d("BLEFW", "FIRMWARE FILE SELECTION CANCELED " + resultCode);
+        BluetoothLePlugin.callbackContext.error("Firmware upgrade aborted");
       }
-      starter.setPrepareDataObjectDelay(300L);
-      final DfuProgressListener dfuProgressListener = new DfuProgressListenerAdapter() {
-        @Override
-        public void onDfuCompleted(final String deviceAddress) {
-          Log.d("BLEFW LISTENER", "ON UPGRADE COMPLETED ");
-          BluetoothLePlugin.callbackContext.success(returnObj);
-          DfuServiceListenerHelper.unregisterProgressListener(cordova.getActivity(), this);
-        }
-
-        @Override
-        public void onDfuAborted(final String deviceAddress) {
-          Log.d("BLEFW LISTENER", "ON UPGRADE ABORTED ");
-          BluetoothLePlugin.callbackContext.error("Firmware upgrade aborted");
-          DfuServiceListenerHelper.unregisterProgressListener(ctx, this);
-        }
-
-        @Override
-        public void onError(final String deviceAddress, int error, int errorType, String message) {
-          Log.d("BLEFW LISTENER", "ON UPGRADE ERROR ");
-          BluetoothLePlugin.callbackContext.error(message);
-          DfuServiceListenerHelper.unregisterProgressListener(ctx, this);
-        }
-      };
-      DfuServiceListenerHelper.registerProgressListener(ctx, dfuProgressListener);
-      starter.setZip(firmwareUri);
-      starter.start(cordova.getActivity(), DfuService.class);
-      Log.d("BLEFW", "UPGRADE STARTED");
     }
   }
 
